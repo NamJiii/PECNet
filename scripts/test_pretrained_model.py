@@ -38,7 +38,7 @@ hyper_params = checkpoint["hyper_params"]
 print(hyper_params)
 
 def test(test_dataset, model, best_of_n = 1):
-
+	print('==start test==')
 	model.eval()
 	assert best_of_n >= 1 and type(best_of_n) == int
 	test_loss = 0
@@ -46,12 +46,15 @@ def test(test_dataset, model, best_of_n = 1):
 	with torch.no_grad():
 		for i, (traj, mask, initial_pos) in enumerate(zip(test_dataset.trajectory_batches, test_dataset.mask_batches, test_dataset.initial_pos_batches)):
 			traj, mask, initial_pos = torch.DoubleTensor(traj).to(device), torch.DoubleTensor(mask).to(device), torch.DoubleTensor(initial_pos).to(device)
+			#traj는 정답 mask는 문제
 			x = traj[:, :hyper_params["past_length"], :]
 			y = traj[:, hyper_params["past_length"]:, :]
 			y = y.cpu().numpy()
 			# reshape the data
 			x = x.contiguous().view(-1, x.shape[1]*x.shape[2])
 			x = x.to(device)
+			print('--start with x--')
+			print(x)
 
 			future = y[:, :-1, :]
 			dest = y[:, -1, :]
@@ -65,7 +68,7 @@ def test(test_dataset, model, best_of_n = 1):
 
 				l2error_sample = np.linalg.norm(dest_recon - dest, axis = 1)
 				all_l2_errors_dest.append(l2error_sample)
-
+			#추측과 에러내기를 여러번 함
 			all_l2_errors_dest = np.array(all_l2_errors_dest)
 			all_guesses = np.array(all_guesses)
 			# average error
@@ -90,6 +93,8 @@ def test(test_dataset, model, best_of_n = 1):
 			# final overall prediction
 			predicted_future = np.concatenate((interpolated_future, best_guess_dest), axis = 1)
 			predicted_future = np.reshape(predicted_future, (-1, hyper_params["future_length"], 2))
+
+			print('**REAL :',y,' |Predicted :',predicted_future,'**')
 
 			# ADE error
 			l2error_overall = np.mean(np.linalg.norm(y - predicted_future, axis = 2))
