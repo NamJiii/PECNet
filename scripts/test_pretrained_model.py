@@ -114,10 +114,14 @@ def main():
 	model = model.double().to(device)
 	model.load_state_dict(checkpoint["model_state_dict"])
 	test_dataset = SocialDataset(set_name="test", b_size=hyper_params["test_b_size"], t_tresh=hyper_params["time_thresh"], d_tresh=hyper_params["dist_thresh"], verbose=args.verbose)
-
+	print(test_dataset.trajectory_batches[0][20])#1 X n X 20(prev8+post20)
+	return 0
 	for traj in test_dataset.trajectory_batches:
+		print('-----',traj)
 		traj -= traj[:, :1, :]
+		print('=====', traj)
 		traj *= hyper_params["data_scale"]
+		print('=-=-=', traj)
 
 	#average ade/fde for k=20 (to account for variance in sampling)
 	num_samples = 150
@@ -127,7 +131,6 @@ def main():
 		average_ade += test_loss
 		average_fde += final_point_loss_best
 
-	print()
 	print("Average ADE:", average_ade/num_samples)
 	print("Average FDE:", average_fde/num_samples)
 
