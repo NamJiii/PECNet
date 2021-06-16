@@ -62,6 +62,70 @@ def mark_similar(mask, sim_list):
 		for j in range(len(sim_list)):
 			mask[sim_list[i]][sim_list[j]] = 1
 
+def custom_collect_data(set_name, dataset_type = 'image', batch_size=512, time_thresh=48, dist_tresh=100, scene=None, verbose=True, root_path="./"):
+
+	assert set_name in ['train','val','test']
+
+	'''Please specify the parent directory of the dataset. In our case data was stored in:
+		root_path/trajnet_image/train/scene_name.txt
+		root_path/trajnet_image/test/scene_name.txt
+	'''
+
+	rel_path = '/trajnet_{0}/{1}/stanford'.format(dataset_type, set_name)
+
+	full_dataset = []
+	full_masks = []
+
+	current_batch = []
+	mask_batch = [[0 for i in range(int(batch_size*1.5))] for j in range(int(batch_size*1.5))]
+
+	current_size = 0
+	social_id = 0
+	part_file = '/{}.txt'.format('*' if scene == None else scene)
+
+	for file in glob.glob(root_path + rel_path + part_file):
+		scene_name = file[len(root_path+rel_path)+1:-6] + file[-5]
+		data = np.loadtxt(fname = file, delimiter = ' ')
+
+		data_by_id = {}
+		for frame_id, person_id, x, y in data:
+			if person_id not in data_by_id.keys():
+				data_by_id[person_id] = []
+			data_by_id[person_id].append([person_id, frame_id, x, y])
+
+		all_data_dict = data_by_id.copy()
+		if verbose:
+			print("Total People: ", len(list(data_by_id.keys())))
+		while len(list(data_by_id.keys()))>0:
+			related_list = []
+			curr_keys = list(data_by_id.keys())
+
+			if current_size<batch_size:
+				pass
+			else:
+				full_dataset.append(current_batch.copy())
+				mask_batch = np.array(mask_batch)
+				full_masks.append(mask_batch[0:len(current_batch), 0:len(current_batch)])
+
+				current_size = 0
+				social_id = 0
+				current_batch = []
+				mask_batch = [[0 for i in range(int(batch_size*1.5))] for j in range(int(batch_size*1.5))]
+
+			current_batch.append((all_data_dict[curr_keys[0]]))
+			related_list.append(current_size)
+			current_size+=1
+			del data_by_id[curr_keys[0]]
+
+			for i in range(1, len(curr_keys)):
+				if social_and_temporal_filter(curr_keys[0], curr_keys[i], all_data_dict, time_thresh, dist_tresh):
+					current_batch.append((all_data_dict[curr_keys[i]]))
+					related_list.append(current_size)
+					current_size+=1
+					del data_by_id[curr_keys[i]]
+
+			mark_similar(mask_batch, related_list)
+			social_id +=1
 
 def collect_data(set_name, dataset_type = 'image', batch_size=512, time_thresh=48, dist_tresh=100, scene=None, verbose=True, root_path="./"):
 
