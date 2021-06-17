@@ -62,11 +62,11 @@ def test(test_dataset, model, best_of_n = 1):
 			all_guesses = []
 			for index in range(best_of_n):
 
-				dest_recon = model.forward(x, initial_pos, device=device)
+				dest_recon = model.forward(x, initial_pos, device=device)#********
 				dest_recon = dest_recon.cpu().numpy()
 				all_guesses.append(dest_recon)
 
-				l2error_sample = np.linalg.norm(dest_recon - dest, axis = 1)
+				l2error_sample = np.linalg.norm(dest_recon - dest, axis = 1)#dest_recon은 추측값, dest는 진짜임
 				all_l2_errors_dest.append(l2error_sample)
 			#추측과 에러내기를 여러번 함
 			all_l2_errors_dest = np.array(all_l2_errors_dest)
@@ -114,13 +114,13 @@ def main():
 	model = model.double().to(device)
 	model.load_state_dict(checkpoint["model_state_dict"])
 	test_dataset = SocialDataset(set_name="test", b_size=hyper_params["test_b_size"], t_tresh=hyper_params["time_thresh"], d_tresh=hyper_params["dist_thresh"], verbose=args.verbose)
-	print(test_dataset.trajectory_batches[0][22])#1 X n X 20(prev8+post20)
-	return 0
+	#print(test_dataset.trajectory_batches[0][22])#batch_num X datadict[key] X 20(prev8+post20) by ID pid fid x y
+	#return 0
 	for traj in test_dataset.trajectory_batches:
 		print('-----',traj)
-		traj -= traj[:, :1, :]
+		traj -= traj[:, :1, :] #위치정보를 변위로 바꿈
 		print('=====', traj)
-		traj *= hyper_params["data_scale"]
+		traj *= hyper_params["data_scale"] #1.86배, 상수임
 		print('=-=-=', traj)
 
 	#average ade/fde for k=20 (to account for variance in sampling)
