@@ -128,7 +128,7 @@ def custom_collect_data(set_name, dataset_type = 'image', batch_size=512, time_t
 			social_id +=1
 
 def collect_data(set_name, dataset_type = 'image', batch_size=512, time_thresh=48, dist_tresh=100, scene=None, verbose=True, root_path="./"):
-
+# -> full_test, full_mask_test
 	assert set_name in ['train','val','test']
 
 	'''Please specify the parent directory of the dataset. In our case data was stored in:
@@ -237,7 +237,6 @@ class SocialDataset(data.Dataset):
 	def __init__(self, set_name="train", b_size=4096, t_tresh=60, d_tresh=50, scene=None, id=False, verbose=True):
 		'Initialization'
 		load_name = "../social_pool_data/{0}_{1}{2}_{3}_{4}.pickle".format(set_name, 'all_' if scene is None else scene[:-2] + scene[-1] + '_', b_size, t_tresh, d_tresh)
-		print(load_name)
 		with open(load_name, 'rb') as f:
 			data = pickle.load(f)
 

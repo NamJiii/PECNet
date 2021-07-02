@@ -36,6 +36,46 @@ checkpoint = torch.load('../saved_models/{}'.format(args.load_file), map_locatio
 hyper_params = checkpoint["hyper_params"]
 
 print(hyper_params)
+def inference(test_dataset, model, best_of_n = 1):
+	model.eval()
+	assert best_of_n >= 1 and type(best_of_n) == int
+	test_loss = 0
+
+	with torch.no_grad():
+		for i, (traj, mask, initial_pos) in enumerate(zip(test_dataset.trajectory_batches, test_dataset.mask_batches, test_dataset.initial_pos_batches)):
+			traj, mask, initial_pos = torch.DoubleTensor(traj).to(device), torch.DoubleTensor(mask).to(device), torch.DoubleTensor(initial_pos).to(device)
+			x = traj[:, :hyper_params["past_length"], :]
+
+			x = x.contiguous().view(-1, x.shape[1]*x.shape[2])#2829*8*2 => 2829*16
+			x = x.to(device)
+
+			all_guesses = []
+
+			#print('x.shape : ',x)# x는 이중 배열  2829*16
+			#print('initial_pos.shape : ', initial_pos)  # x는 이중 배열 2829*2
+
+			dest_recon = model.forward(x, initial_pos, device=device)#********
+			#print('dest_recon : ',dest_recon)#2829*2
+			dest_recon = dest_recon.cpu().numpy()
+
+			#all_guesses.append(dest_recon)
+			#all_guesses = np.array(all_guesses)
+			#best_guess_dest = all_guesses[indices,np.arange(x.shape[0]),  :]
+
+			best_guess_dest = dest_recon
+			# back to torch land
+			best_guess_dest = torch.DoubleTensor(best_guess_dest).to(device)
+
+			# using the best guess for interpolation
+			interpolated_future = model.predict(x, best_guess_dest, mask, initial_pos)
+			interpolated_future = interpolated_future.cpu().numpy()
+			best_guess_dest = best_guess_dest.cpu().numpy()
+
+			# final overall prediction
+			predicted_future = np.concatenate((interpolated_future, best_guess_dest), axis = 1)
+			predicted_future = np.reshape(predicted_future, (-1, hyper_params["future_length"], 2))
+
+	return x, predicted_future
 
 def test(test_dataset, model, best_of_n = 1):
 	print('==start test==')
@@ -51,18 +91,22 @@ def test(test_dataset, model, best_of_n = 1):
 			y = traj[:, hyper_params["past_length"]:, :]
 			y = y.cpu().numpy()
 			# reshape the data
-			x = x.contiguous().view(-1, x.shape[1]*x.shape[2])
+			#print(x.shape)
+			x = x.contiguous().view(-1, x.shape[1]*x.shape[2])#2829*8*2 => 2829*16
 			x = x.to(device)
-			print('--start with x--')
-			print(x)
+			#print('--start with x--')
+			#print(x.shape)
 
 			future = y[:, :-1, :]
 			dest = y[:, -1, :]
 			all_l2_errors_dest = []
 			all_guesses = []
 			for index in range(best_of_n):
+				print('x.shape : ',x)# x는 이중 배열  2829*16
+				print('initial_pos.shape : ', initial_pos)  # x는 이중 배열 2829*2
 
 				dest_recon = model.forward(x, initial_pos, device=device)#********
+				print('dest_recon : ',dest_recon)#2829*2
 				dest_recon = dest_recon.cpu().numpy()
 				all_guesses.append(dest_recon)
 
@@ -117,21 +161,16 @@ def main():
 	#print(test_dataset.trajectory_batches[0][22])#batch_num X datadict[key] X 20(prev8+post20) by ID pid fid x y
 	#return 0
 	for traj in test_dataset.trajectory_batches:
-		print('-----',traj)
+		#print('-----',type(traj))
 		traj -= traj[:, :1, :] #위치정보를 변위로 바꿈
-		print('=====', traj)
+		#print('=====', traj)
 		traj *= hyper_params["data_scale"] #1.86배, 상수임
-		print('=-=-=', traj)
+		#print('=-=-=', traj)
 
 	#average ade/fde for k=20 (to account for variance in sampling)
 	num_samples = 150
 	average_ade, average_fde = 0, 0
 	for i in range(num_samples):
-		test_loss, final_point_loss_best, final_point_loss_avg = test(test_dataset, model, best_of_n = N)
-		average_ade += test_loss
-		average_fde += final_point_loss_best
-
-	print("Average ADE:", average_ade/num_samples)
-	print("Average FDE:", average_fde/num_samples)
-
+		x, predicted= inference(test_dataset, model, best_of_n = N)
+		print(x,predicted)
 main()
