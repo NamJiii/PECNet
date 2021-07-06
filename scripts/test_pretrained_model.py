@@ -44,38 +44,44 @@ def inference(test_dataset, model, best_of_n = 1):
 	with torch.no_grad():
 		for i, (traj, mask, initial_pos) in enumerate(zip(test_dataset.trajectory_batches, test_dataset.mask_batches, test_dataset.initial_pos_batches)):
 			traj, mask, initial_pos = torch.DoubleTensor(traj).to(device), torch.DoubleTensor(mask).to(device), torch.DoubleTensor(initial_pos).to(device)
-			x = traj[:, :hyper_params["past_length"], :]
-
+			x = traj[:, :hyper_params["past_length"], :]#2829*20*2 => 2829*8*2
+			sample_data = [[[0.0,0.0],
+							[710.0,10.0],
+							[620.0,20.0],
+							[530.0,30.0],
+							[440.0,40.0],
+							[350.0,50.0],
+							[260.0,60.0],
+							[170.0,70.0]],
+						   [[0.0,0.0],
+							[10.0,1.0],
+							[20.0,2.0],
+							[30.0,3.0],
+							[40.0,4.0],
+							[50.0,5.0],
+							[60.0,6.0],
+							[70.0,7.0]]]#2*5*2
+			#print('x : ',x[:10,:,:])
 			x = x.contiguous().view(-1, x.shape[1]*x.shape[2])#2829*8*2 => 2829*16
+			#print('x : ', x[:10, :])
+			sample_data = torch.DoubleTensor(sample_data).to(device)
+			sample_data = sample_data.contiguous().view(-1,sample_data.shape[1]*sample_data.shape[2])
+			sample_data = sample_data.to(device)
 			x = x.to(device)
 
 			all_guesses = []
 
 			#print('x.shape : ',x)# x는 이중 배열  2829*16
 			#print('initial_pos.shape : ', initial_pos)  # x는 이중 배열 2829*2
-
-			dest_recon = model.forward(x, initial_pos, device=device)#********
+			init = []
+			dest_recon = model.forward(sample_data, init, device=device)#********'''initial_pos[:100,:]''',
 			#print('dest_recon : ',dest_recon)#2829*2
 			dest_recon = dest_recon.cpu().numpy()
 
-			#all_guesses.append(dest_recon)
-			#all_guesses = np.array(all_guesses)
-			#best_guess_dest = all_guesses[indices,np.arange(x.shape[0]),  :]
+			#print('initial_pos : ',initial_pos[:10,:])
+			print('dest_recon : ',dest_recon)
 
-			best_guess_dest = dest_recon
-			# back to torch land
-			best_guess_dest = torch.DoubleTensor(best_guess_dest).to(device)
-
-			# using the best guess for interpolation
-			interpolated_future = model.predict(x, best_guess_dest, mask, initial_pos)
-			interpolated_future = interpolated_future.cpu().numpy()
-			best_guess_dest = best_guess_dest.cpu().numpy()
-
-			# final overall prediction
-			predicted_future = np.concatenate((interpolated_future, best_guess_dest), axis = 1)
-			predicted_future = np.reshape(predicted_future, (-1, hyper_params["future_length"], 2))
-
-	return x, predicted_future
+	return dest_recon
 
 def test(test_dataset, model, best_of_n = 1):
 	print('==start test==')
@@ -168,9 +174,8 @@ def main():
 		#print('=-=-=', traj)
 
 	#average ade/fde for k=20 (to account for variance in sampling)
-	num_samples = 150
+	num_samples = 1
 	average_ade, average_fde = 0, 0
 	for i in range(num_samples):
-		x, predicted= inference(test_dataset, model, best_of_n = N)
-		print(x,predicted)
+		predicted= inference(test_dataset, model, best_of_n = N)
 main()
